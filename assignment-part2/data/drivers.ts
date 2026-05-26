@@ -35,6 +35,6 @@ export const drivers: Driver[] = [
     plate: "CAB771",
     suburb: "Mount Eden",
     rating: 4.5,
-    available: false,
+    available: true,
   },
 ];

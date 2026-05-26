@@ -1,11 +1,5 @@
 "use client";
 
-/*
-Student Name: Vrishab Chetty
-File: page.tsx
-Description: Main page for the CabsOnline Part 2 Next.js application.
-*/
-
 import { useEffect, useMemo, useState } from "react";
 import { Car, CheckCircle } from "lucide-react";
 import BookingForm from "@/components/BookingForm";
@@ -15,16 +9,50 @@ import DriverList from "@/components/DriverList";
 import MapPanel from "@/components/MapPanel";
 import { drivers } from "@/data/drivers";
 import type { Booking } from "@/types/cabsonline";
+import { supabase } from "@/lib/supabaseClient";
 import {
   estimateFare,
   formatDate,
   generateBookingReference,
   getCurrentTime,
   getToday,
-  loadBookings,
-  saveBookings,
-  STORAGE_KEY,
 } from "@/utils/bookingUtils";
+
+function dbToBooking(row: any): Booking {
+  return {
+    bookingRef: row.booking_ref,
+    cname: row.cname,
+    phone: row.phone,
+    unumber: row.unumber || "",
+    snumber: row.snumber || "",
+    stname: row.stname || "",
+    pickupAddress: row.pickup_address || "",
+    destinationAddress: row.destination_address || "",
+    sbname: row.sbname || "",
+    dsbname: row.dsbname || "",
+    pickupLat: row.pickup_lat ?? undefined,
+    pickupLon: row.pickup_lon ?? undefined,
+    destinationLat: row.destination_lat ?? undefined,
+    destinationLon: row.destination_lon ?? undefined,
+    date: row.pickup_date,
+    time: row.pickup_time?.slice(0, 5) || "",
+    paymentMethod: row.payment_method || "Card",
+    status: row.status,
+    paymentStatus: row.payment_status,
+    driverId: row.driver_id || "",
+    driverName: row.driver_name || "",
+    driverCar: row.driver_car || "",
+    driverPlate: row.driver_plate || "",
+    bookingCreated: row.booking_datetime || "",
+    estimatedFare: Number(row.estimated_fare || 0),
+    trackingStep: row.tracking_step || 1,
+  };
+}
+
+function isElapsedBooking(booking: Booking) {
+  const pickupDateTime = new Date(`${booking.date}T${booking.time}`);
+  return pickupDateTime < new Date();
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("booking");
@@ -52,18 +80,35 @@ export default function Home() {
     paymentMethod: "Card",
   });
 
+  async function loadBookingsFromSupabase() {
+    const { data, error } = await supabase
+      .from("cabsonline_bookings")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      setMessage(error.message);
+      return;
+    }
+
+    setBookings((data || []).map(dbToBooking));
+  }
+
   useEffect(() => {
-    setBookings(loadBookings());
+    loadBookingsFromSupabase();
   }, []);
 
-  useEffect(() => {
-    saveBookings(bookings);
-  }, [bookings]);
-
   const filteredBookings = useMemo(() => {
-    if (!adminSearch.trim()) return bookings;
+    const visibleBookings = bookings.filter(
+      (booking) =>
+        booking.status !== "completed" &&
+        !isElapsedBooking(booking)
+    );
 
-    return bookings.filter((booking) =>
+    if (!adminSearch.trim()) return visibleBookings;
+
+    return visibleBookings.filter((booking) =>
       booking.bookingRef.toLowerCase().includes(adminSearch.toLowerCase())
     );
   }, [bookings, adminSearch]);
@@ -90,12 +135,10 @@ export default function Home() {
     if (
       form.cname.trim() === "" ||
       form.phone.trim() === "" ||
-      form.snumber.trim() === "" ||
-      form.stname.trim() === "" ||
       form.pickupAddress.trim() === "" ||
       form.destinationAddress.trim() === ""
     ) {
-      return "Please fill in customer name, phone, pickup address, destination address, street number, and street name.";
+      return "Please fill in customer name, phone, pickup address, and destination address.";
     }
 
     if (!/^[0-9]{10,12}$/.test(form.phone)) {
@@ -111,7 +154,21 @@ export default function Home() {
     return "";
   }
 
-  function submitBooking(event: React.FormEvent<HTMLFormElement>) {
+  function driverIsBusyWithinNextHour(driverId: string) {
+    const now = new Date();
+    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+
+    return bookings.some((booking) => {
+      if (booking.driverId !== driverId) return false;
+      if (booking.status !== "assigned") return false;
+
+      const pickupDateTime = new Date(`${booking.date}T${booking.time}`);
+
+      return pickupDateTime >= now && pickupDateTime <= oneHourLater;
+    });
+  }
+
+  async function submitBooking(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const error = validateBooking();
@@ -122,24 +179,41 @@ export default function Home() {
     }
 
     const bookingRef = generateBookingReference(bookings);
+    const fare = estimateFare(form.sbname, form.dsbname);
 
-    const newBooking: Booking = {
-      bookingRef,
-      ...form,
-      status: "unassigned",
-      paymentStatus: "pending",
-      driverId: "",
-      driverName: "",
-      driverCar: "",
-      driverPlate: "",
-      bookingCreated: new Date().toISOString(),
-      estimatedFare: estimateFare(form.sbname, form.dsbname),
-      trackingStep: 1,
-    };
+    const { error: insertError } = await supabase
+      .from("cabsonline_bookings")
+      .insert({
+        booking_ref: bookingRef,
+        cname: form.cname,
+        phone: form.phone,
+        unumber: form.unumber,
+        snumber: form.snumber,
+        stname: form.stname,
+        sbname: form.sbname,
+        dsbname: form.dsbname,
+        pickup_address: form.pickupAddress,
+        destination_address: form.destinationAddress,
+        pickup_lat: form.pickupLat,
+        pickup_lon: form.pickupLon,
+        destination_lat: form.destinationLat,
+        destination_lon: form.destinationLon,
+        pickup_date: form.date,
+        pickup_time: form.time,
+        status: "unassigned",
+        payment_status: "pending",
+        payment_method: form.paymentMethod,
+        estimated_fare: fare,
+        tracking_step: 1,
+      });
 
-    setBookings((previous) => [...previous, newBooking]);
+    if (insertError) {
+      console.error(insertError);
+      setMessage(insertError.message);
+      return;
+    }
+
     setTrackingSearch(bookingRef);
-
     setMessage(
       `Thank you for your booking! Booking reference number: ${bookingRef}. Pickup time: ${form.time}. Pickup date: ${formatDate(form.date)}.`
     );
@@ -162,67 +236,114 @@ export default function Home() {
       time: getCurrentTime(),
       paymentMethod: "Card",
     });
+
+    await loadBookingsFromSupabase();
   }
 
-  function assignDriver(bookingRef: string, driverId: string) {
+  async function assignDriver(bookingRef: string, driverId: string) {
     const driver = drivers.find((item) => item.id === driverId);
 
     if (!driver) return;
 
-    setBookings((previous) =>
-      previous.map((booking) =>
-        booking.bookingRef === bookingRef
-          ? {
-              ...booking,
-              status: "assigned",
-              driverId: driver.id,
-              driverName: driver.name,
-              driverCar: driver.car,
-              driverPlate: driver.plate,
-              trackingStep: Math.max(booking.trackingStep, 2),
-            }
-          : booking
-      )
-    );
+    if (driverIsBusyWithinNextHour(driver.id)) {
+      setMessage(`${driver.name} has a booking within the next hour.`);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("cabsonline_bookings")
+      .update({
+        status: "assigned",
+        driver_id: driver.id,
+        driver_name: driver.name,
+        driver_car: driver.car,
+        driver_plate: driver.plate,
+        tracking_step: 2,
+      })
+      .eq("booking_ref", bookingRef);
+
+    if (error) {
+      console.error(error);
+      setMessage(error.message);
+      return;
+    }
 
     setMessage(`Booking ${bookingRef} has been assigned to ${driver.name}.`);
+    await loadBookingsFromSupabase();
   }
 
-  function processPayment(bookingRef: string) {
-    setBookings((previous) =>
-      previous.map((booking) =>
-        booking.bookingRef === bookingRef
-          ? {
-              ...booking,
-              paymentStatus: "paid",
-            }
-          : booking
-      )
-    );
+  async function processPayment(bookingRef: string) {
+    const { error } = await supabase
+      .from("cabsonline_bookings")
+      .update({
+        payment_status: "paid",
+      })
+      .eq("booking_ref", bookingRef);
+
+    if (error) {
+      console.error(error);
+      setMessage(error.message);
+      return;
+    }
 
     setMessage(`Payment for booking ${bookingRef} has been completed.`);
+    await loadBookingsFromSupabase();
   }
 
-  function progressTracking(bookingRef: string) {
-    setBookings((previous) =>
-      previous.map((booking) => {
-        if (booking.bookingRef !== bookingRef) return booking;
+  async function progressTracking(bookingRef: string) {
+    const booking = bookings.find((item) => item.bookingRef === bookingRef);
 
-        const nextStep = Math.min(4, booking.trackingStep + 1);
+    if (!booking) return;
 
-        return {
-          ...booking,
-          trackingStep: nextStep,
-          status: nextStep >= 4 ? "completed" : booking.status,
-        };
+    if (booking.status === "unassigned") {
+      setMessage("A driver must be assigned before the trip can progress.");
+      return;
+    }
+
+    if (booking.paymentStatus !== "paid") {
+      setMessage("Payment must be completed before the driver can go on the way.");
+      return;
+    }
+
+    const nextStep = Math.min(4, booking.trackingStep + 1);
+
+    const { error } = await supabase
+      .from("cabsonline_bookings")
+      .update({
+        tracking_step: nextStep,
+        status: nextStep >= 4 ? "completed" : "assigned",
       })
-    );
+      .eq("booking_ref", bookingRef);
+
+    if (error) {
+      console.error(error);
+      setMessage(error.message);
+      return;
+    }
+
+    if (nextStep === 3) {
+      setMessage(`Driver is now on the way for booking ${bookingRef}.`);
+    } else if (nextStep === 4) {
+      setMessage(`Trip for booking ${bookingRef} has been completed.`);
+    }
+
+    await loadBookingsFromSupabase();
   }
 
-  function clearDemoData() {
-    localStorage.removeItem(STORAGE_KEY);
-    setBookings([]);
+  async function clearDemoData() {
+    const { error } = await supabase
+      .from("cabsonline_bookings")
+      .delete()
+      .neq("booking_ref", "");
+
+    if (error) {
+      console.error(error);
+      setMessage(error.message);
+      return;
+    }
+
     setMessage("Demo data has been cleared.");
+    await loadBookingsFromSupabase();
   }
 
   return (
@@ -232,9 +353,9 @@ export default function Home() {
           <p className="eyebrow">CabsOnline Part 2</p>
           <h1>Modern Taxi Booking System</h1>
           <p>
-            A Next.js extension of the Part 1 taxi booking system with real NZ
-            address search, map-based interaction, driver assignment, customer
-            tracking, and payment simulation.
+            A standalone Next.js taxi booking system with Supabase database,
+            real NZ address search, map-based interaction, driver assignment,
+            customer tracking, and customer-side payment simulation.
           </p>
         </div>
 
@@ -305,7 +426,6 @@ export default function Home() {
           adminSearch={adminSearch}
           setAdminSearch={setAdminSearch}
           assignDriver={assignDriver}
-          processPayment={processPayment}
           clearDemoData={clearDemoData}
         />
       )}
@@ -317,6 +437,7 @@ export default function Home() {
             setTrackingSearch={setTrackingSearch}
             trackingBooking={trackingBooking}
             progressTracking={progressTracking}
+            processPayment={processPayment}
           />
 
           <MapPanel
@@ -328,7 +449,7 @@ export default function Home() {
         </section>
       )}
 
-      {activeTab === "drivers" && <DriverList />}
+      {activeTab === "drivers" && <DriverList bookings={bookings} />}
     </main>
   );
 }

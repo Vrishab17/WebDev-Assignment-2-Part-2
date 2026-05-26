@@ -11,7 +11,6 @@ type Props = {
   adminSearch: string;
   setAdminSearch: (value: string) => void;
   assignDriver: (bookingRef: string, driverId: string) => void;
-  processPayment: (bookingRef: string) => void;
   clearDemoData: () => void;
 };
 
@@ -20,7 +19,6 @@ export default function AdminDashboard({
   adminSearch,
   setAdminSearch,
   assignDriver,
-  processPayment,
   clearDemoData,
 }: Props) {
   return (
@@ -28,7 +26,7 @@ export default function AdminDashboard({
       <div className="sectionHeader">
         <div>
           <h2>Admin Dashboard</h2>
-          <p>Search bookings, assign drivers, and process payments.</p>
+          <p>Search active bookings and assign drivers.</p>
         </div>
 
         <button className="danger" onClick={clearDemoData}>
@@ -58,7 +56,7 @@ export default function AdminDashboard({
               <th>Status</th>
               <th>Payment</th>
               <th>Driver</th>
-              <th>Action</th>
+              <th>Assign</th>
             </tr>
           </thead>
 
@@ -79,38 +77,27 @@ export default function AdminDashboard({
                 <td>{booking.paymentStatus}</td>
                 <td>{booking.driverName || "Not assigned"}</td>
                 <td>
-                  <div className="actions">
-                    <select
-                      disabled={booking.status !== "unassigned"}
-                      defaultValue=""
-                      onChange={(event) =>
-                        assignDriver(booking.bookingRef, event.target.value)
-                      }
-                    >
-                      <option value="">Assign</option>
-                      {drivers
-                        .filter((driver) => driver.available)
-                        .map((driver) => (
-                          <option key={driver.id} value={driver.id}>
-                            {driver.name}
-                          </option>
-                        ))}
-                    </select>
-
-                    <button
-                      disabled={booking.paymentStatus === "paid"}
-                      onClick={() => processPayment(booking.bookingRef)}
-                    >
-                      Pay
-                    </button>
-                  </div>
+                  <select
+                    disabled={booking.status !== "unassigned"}
+                    defaultValue=""
+                    onChange={(event) =>
+                      assignDriver(booking.bookingRef, event.target.value)
+                    }
+                  >
+                    <option value="">Assign</option>
+                    {drivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>
+                        {driver.name}
+                      </option>
+                    ))}
+                  </select>
                 </td>
               </tr>
             ))}
 
             {bookings.length === 0 && (
               <tr>
-                <td colSpan={10}>No bookings found.</td>
+                <td colSpan={10}>No active bookings found.</td>
               </tr>
             )}
           </tbody>

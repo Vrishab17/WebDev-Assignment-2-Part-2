@@ -473,3 +473,11 @@ th {
   color: #15284c !important;
   border: none !important;
 }
+
+.paymentButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
