@@ -1,65 +1,334 @@
-import Image from "next/image";
+"use client";
+
+/*
+Student Name: Vrishab Chetty
+File: page.tsx
+Description: Main page for the CabsOnline Part 2 Next.js application.
+*/
+
+import { useEffect, useMemo, useState } from "react";
+import { Car, CheckCircle } from "lucide-react";
+import BookingForm from "@/components/BookingForm";
+import AdminDashboard from "@/components/AdminDashboard";
+import TrackingPanel from "@/components/TrackingPanel";
+import DriverList from "@/components/DriverList";
+import MapPanel from "@/components/MapPanel";
+import { drivers } from "@/data/drivers";
+import type { Booking } from "@/types/cabsonline";
+import {
+  estimateFare,
+  formatDate,
+  generateBookingReference,
+  getCurrentTime,
+  getToday,
+  loadBookings,
+  saveBookings,
+  STORAGE_KEY,
+} from "@/utils/bookingUtils";
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState("booking");
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [message, setMessage] = useState("");
+  const [adminSearch, setAdminSearch] = useState("");
+  const [trackingSearch, setTrackingSearch] = useState("");
+
+  const [form, setForm] = useState({
+    cname: "",
+    phone: "",
+    unumber: "",
+    snumber: "",
+    stname: "",
+    sbname: "",
+    dsbname: "",
+    pickupAddress: "",
+    destinationAddress: "",
+    pickupLat: undefined as number | undefined,
+    pickupLon: undefined as number | undefined,
+    destinationLat: undefined as number | undefined,
+    destinationLon: undefined as number | undefined,
+    date: getToday(),
+    time: getCurrentTime(),
+    paymentMethod: "Card",
+  });
+
+  useEffect(() => {
+    setBookings(loadBookings());
+  }, []);
+
+  useEffect(() => {
+    saveBookings(bookings);
+  }, [bookings]);
+
+  const filteredBookings = useMemo(() => {
+    if (!adminSearch.trim()) return bookings;
+
+    return bookings.filter((booking) =>
+      booking.bookingRef.toLowerCase().includes(adminSearch.toLowerCase())
+    );
+  }, [bookings, adminSearch]);
+
+  const trackingBooking = useMemo(() => {
+    if (!trackingSearch.trim()) return null;
+
+    return (
+      bookings.find(
+        (booking) =>
+          booking.bookingRef.toLowerCase() === trackingSearch.toLowerCase()
+      ) || null
+    );
+  }, [bookings, trackingSearch]);
+
+  function updateForm(field: string, value: string | number | undefined) {
+    setForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  }
+
+  function validateBooking() {
+    if (
+      form.cname.trim() === "" ||
+      form.phone.trim() === "" ||
+      form.snumber.trim() === "" ||
+      form.stname.trim() === "" ||
+      form.pickupAddress.trim() === "" ||
+      form.destinationAddress.trim() === ""
+    ) {
+      return "Please fill in customer name, phone, pickup address, destination address, street number, and street name.";
+    }
+
+    if (!/^[0-9]{10,12}$/.test(form.phone)) {
+      return "Phone number must contain only numbers and be 10 to 12 digits long.";
+    }
+
+    const pickupDateTime = new Date(`${form.date}T${form.time}`);
+
+    if (pickupDateTime < new Date()) {
+      return "Pickup date and time must not be earlier than now.";
+    }
+
+    return "";
+  }
+
+  function submitBooking(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const error = validateBooking();
+
+    if (error) {
+      setMessage(error);
+      return;
+    }
+
+    const bookingRef = generateBookingReference(bookings);
+
+    const newBooking: Booking = {
+      bookingRef,
+      ...form,
+      status: "unassigned",
+      paymentStatus: "pending",
+      driverId: "",
+      driverName: "",
+      driverCar: "",
+      driverPlate: "",
+      bookingCreated: new Date().toISOString(),
+      estimatedFare: estimateFare(form.sbname, form.dsbname),
+      trackingStep: 1,
+    };
+
+    setBookings((previous) => [...previous, newBooking]);
+    setTrackingSearch(bookingRef);
+
+    setMessage(
+      `Thank you for your booking! Booking reference number: ${bookingRef}. Pickup time: ${form.time}. Pickup date: ${formatDate(form.date)}.`
+    );
+
+    setForm({
+      cname: "",
+      phone: "",
+      unumber: "",
+      snumber: "",
+      stname: "",
+      sbname: "",
+      dsbname: "",
+      pickupAddress: "",
+      destinationAddress: "",
+      pickupLat: undefined,
+      pickupLon: undefined,
+      destinationLat: undefined,
+      destinationLon: undefined,
+      date: getToday(),
+      time: getCurrentTime(),
+      paymentMethod: "Card",
+    });
+  }
+
+  function assignDriver(bookingRef: string, driverId: string) {
+    const driver = drivers.find((item) => item.id === driverId);
+
+    if (!driver) return;
+
+    setBookings((previous) =>
+      previous.map((booking) =>
+        booking.bookingRef === bookingRef
+          ? {
+              ...booking,
+              status: "assigned",
+              driverId: driver.id,
+              driverName: driver.name,
+              driverCar: driver.car,
+              driverPlate: driver.plate,
+              trackingStep: Math.max(booking.trackingStep, 2),
+            }
+          : booking
+      )
+    );
+
+    setMessage(`Booking ${bookingRef} has been assigned to ${driver.name}.`);
+  }
+
+  function processPayment(bookingRef: string) {
+    setBookings((previous) =>
+      previous.map((booking) =>
+        booking.bookingRef === bookingRef
+          ? {
+              ...booking,
+              paymentStatus: "paid",
+            }
+          : booking
+      )
+    );
+
+    setMessage(`Payment for booking ${bookingRef} has been completed.`);
+  }
+
+  function progressTracking(bookingRef: string) {
+    setBookings((previous) =>
+      previous.map((booking) => {
+        if (booking.bookingRef !== bookingRef) return booking;
+
+        const nextStep = Math.min(4, booking.trackingStep + 1);
+
+        return {
+          ...booking,
+          trackingStep: nextStep,
+          status: nextStep >= 4 ? "completed" : booking.status,
+        };
+      })
+    );
+  }
+
+  function clearDemoData() {
+    localStorage.removeItem(STORAGE_KEY);
+    setBookings([]);
+    setMessage("Demo data has been cleared.");
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="app">
+      <header className="hero">
+        <div>
+          <p className="eyebrow">CabsOnline Part 2</p>
+          <h1>Modern Taxi Booking System</h1>
+          <p>
+            A Next.js extension of the Part 1 taxi booking system with real NZ
+            address search, map-based interaction, driver assignment, customer
+            tracking, and payment simulation.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="heroCard">
+          <Car size={36} />
+          <strong>{bookings.length}</strong>
+          <span>Total Bookings</span>
         </div>
-      </main>
-    </div>
+      </header>
+
+      <nav className="tabs">
+        <button
+          className={activeTab === "booking" ? "active" : ""}
+          onClick={() => setActiveTab("booking")}
+        >
+          Booking
+        </button>
+
+        <button
+          className={activeTab === "admin" ? "active" : ""}
+          onClick={() => setActiveTab("admin")}
+        >
+          Admin Dashboard
+        </button>
+
+        <button
+          className={activeTab === "tracking" ? "active" : ""}
+          onClick={() => setActiveTab("tracking")}
+        >
+          Customer Tracking
+        </button>
+
+        <button
+          className={activeTab === "drivers" ? "active" : ""}
+          onClick={() => setActiveTab("drivers")}
+        >
+          Drivers
+        </button>
+      </nav>
+
+      {message && (
+        <div className="message">
+          <CheckCircle size={18} />
+          <span>{message}</span>
+        </div>
+      )}
+
+      {activeTab === "booking" && (
+        <section className="grid two">
+          <BookingForm
+            form={form}
+            updateForm={updateForm}
+            submitBooking={submitBooking}
+          />
+
+          <MapPanel
+            pickupLat={form.pickupLat}
+            pickupLon={form.pickupLon}
+            destinationLat={form.destinationLat}
+            destinationLon={form.destinationLon}
+          />
+        </section>
+      )}
+
+      {activeTab === "admin" && (
+        <AdminDashboard
+          bookings={filteredBookings}
+          adminSearch={adminSearch}
+          setAdminSearch={setAdminSearch}
+          assignDriver={assignDriver}
+          processPayment={processPayment}
+          clearDemoData={clearDemoData}
+        />
+      )}
+
+      {activeTab === "tracking" && (
+        <section className="grid two">
+          <TrackingPanel
+            trackingSearch={trackingSearch}
+            setTrackingSearch={setTrackingSearch}
+            trackingBooking={trackingBooking}
+            progressTracking={progressTracking}
+          />
+
+          <MapPanel
+            pickupLat={trackingBooking?.pickupLat}
+            pickupLon={trackingBooking?.pickupLon}
+            destinationLat={trackingBooking?.destinationLat}
+            destinationLon={trackingBooking?.destinationLon}
+          />
+        </section>
+      )}
+
+      {activeTab === "drivers" && <DriverList />}
+    </main>
   );
 }
