@@ -1,7 +1,7 @@
 # CabsOnline Part 2
 
 ## Public URL
-Public deployed application URL: Not deployed from this local workspace yet.
+Public deployed application URL: https://web-dev-assignment-2-part-2.vercel.app/
 
 Local development URL used for testing: `http://localhost:3001`
 
@@ -147,10 +147,9 @@ Use the actual reference shown in the booking confirmation message when testing 
 ## Known Limitations
 - Demo admin and driver login are hardcoded and are not secure production authentication.
 - Payment is simulated by setting `payment_status = paid`; no external payment gateway is integrated.
-- The public deployed URL has not been configured in this local workspace.
 - Booking reference generation is incremental from loaded Supabase bookings and is suitable for the assignment demo, but a production app should generate references transactionally on the server.
 - Nominatim is a public geocoding service and may rate-limit heavy use.
 - The map draws a straight line between pickup and destination rather than road-routing.
 
 ## AI-Supported Development Reflection
-AI assistance was used to audit the assignment requirements, identify gaps between the rubric and the current implementation, and refactor the app into customer, admin, and driver routes. The AI-supported process helped keep the code organized by moving shared logic into helper files, documenting the project map in `AGENTS.md`, and checking build output after changes. Human review remains important for validating deployed environment variables, confirming Supabase table policies, and testing the full workflow in a browser with real data.
+AI assistance was used during development to help debug errors, check the Part 2 requirements, and compare whether the existing AUT webdev/MySQL server or Supabase would be more suitable for a standalone deployed app. It was also used to help structure the README.DOC and review whether the project covered the required features. The final implementation, testing, and project decisions were manually reviewed.
