@@ -1,5 +1,5 @@
 "use client";
-//empty comit
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Car, CheckCircle } from "lucide-react";
@@ -61,6 +61,16 @@ export default function Home() {
   useEffect(() => {
     loadBookingsFromSupabase();
   }, []);
+
+  useEffect(() => {
+    if (!trackingSearch.trim()) return;
+
+    const timer = setTimeout(() => {
+      loadBookingsFromSupabase();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [trackingSearch]);
 
   const trackingBooking = useMemo(() => {
     if (!trackingSearch.trim()) return null;

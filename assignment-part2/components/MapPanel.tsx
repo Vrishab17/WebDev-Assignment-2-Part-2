@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { LayerGroup, Map } from "leaflet";
 
 type Props = {
   pickupLat?: number;
@@ -16,8 +17,8 @@ export default function MapPanel({
   destinationLon,
 }: Props) {
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const leafletMapRef = useRef<any>(null);
-  const markerLayerRef = useRef<any>(null);
+  const leafletMapRef = useRef<Map | null>(null);
+  const markerLayerRef = useRef<LayerGroup | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
@@ -28,7 +29,9 @@ export default function MapPanel({
 
       const L = await import("leaflet");
 
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      delete (
+        L.Icon.Default.prototype as { _getIconUrl?: unknown }
+      )._getIconUrl;
 
       L.Icon.Default.mergeOptions({
         iconRetinaUrl:
