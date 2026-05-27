@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Car, CheckCircle } from "lucide-react";
 import BookingForm from "@/components/BookingForm";
-import AdminDashboard from "@/components/AdminDashboard";
 import TrackingPanel from "@/components/TrackingPanel";
 import DriverList from "@/components/DriverList";
 import MapPanel from "@/components/MapPanel";
-import { drivers } from "@/data/drivers";
 import type { Booking } from "@/types/cabsonline";
 import { supabase } from "@/lib/supabaseClient";
+import { dbToBooking } from "@/utils/bookingFilters";
 import {
   estimateFare,
   formatDate,
@@ -18,47 +18,10 @@ import {
   getToday,
 } from "@/utils/bookingUtils";
 
-function dbToBooking(row: any): Booking {
-  return {
-    bookingRef: row.booking_ref,
-    cname: row.cname,
-    phone: row.phone,
-    unumber: row.unumber || "",
-    snumber: row.snumber || "",
-    stname: row.stname || "",
-    pickupAddress: row.pickup_address || "",
-    destinationAddress: row.destination_address || "",
-    sbname: row.sbname || "",
-    dsbname: row.dsbname || "",
-    pickupLat: row.pickup_lat ?? undefined,
-    pickupLon: row.pickup_lon ?? undefined,
-    destinationLat: row.destination_lat ?? undefined,
-    destinationLon: row.destination_lon ?? undefined,
-    date: row.pickup_date,
-    time: row.pickup_time?.slice(0, 5) || "",
-    paymentMethod: row.payment_method || "Card",
-    status: row.status,
-    paymentStatus: row.payment_status,
-    driverId: row.driver_id || "",
-    driverName: row.driver_name || "",
-    driverCar: row.driver_car || "",
-    driverPlate: row.driver_plate || "",
-    bookingCreated: row.booking_datetime || "",
-    estimatedFare: Number(row.estimated_fare || 0),
-    trackingStep: row.tracking_step || 1,
-  };
-}
-
-function isElapsedBooking(booking: Booking) {
-  const pickupDateTime = new Date(`${booking.date}T${booking.time}`);
-  return pickupDateTime < new Date();
-}
-
 export default function Home() {
   const [activeTab, setActiveTab] = useState("booking");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [message, setMessage] = useState("");
-  const [adminSearch, setAdminSearch] = useState("");
   const [trackingSearch, setTrackingSearch] = useState("");
 
   const [form, setForm] = useState({
@@ -99,20 +62,6 @@ export default function Home() {
     loadBookingsFromSupabase();
   }, []);
 
-  const filteredBookings = useMemo(() => {
-    const visibleBookings = bookings.filter(
-      (booking) =>
-        booking.status !== "completed" &&
-        !isElapsedBooking(booking)
-    );
-
-    if (!adminSearch.trim()) return visibleBookings;
-
-    return visibleBookings.filter((booking) =>
-      booking.bookingRef.toLowerCase().includes(adminSearch.toLowerCase())
-    );
-  }, [bookings, adminSearch]);
-
   const trackingBooking = useMemo(() => {
     if (!trackingSearch.trim()) return null;
 
@@ -152,20 +101,6 @@ export default function Home() {
     }
 
     return "";
-  }
-
-  function driverIsBusyWithinNextHour(driverId: string) {
-    const now = new Date();
-    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
-
-    return bookings.some((booking) => {
-      if (booking.driverId !== driverId) return false;
-      if (booking.status !== "assigned") return false;
-
-      const pickupDateTime = new Date(`${booking.date}T${booking.time}`);
-
-      return pickupDateTime >= now && pickupDateTime <= oneHourLater;
-    });
   }
 
   async function submitBooking(event: React.FormEvent<HTMLFormElement>) {
@@ -240,38 +175,6 @@ export default function Home() {
     await loadBookingsFromSupabase();
   }
 
-  async function assignDriver(bookingRef: string, driverId: string) {
-    const driver = drivers.find((item) => item.id === driverId);
-
-    if (!driver) return;
-
-    if (driverIsBusyWithinNextHour(driver.id)) {
-      setMessage(`${driver.name} has a booking within the next hour.`);
-      return;
-    }
-
-    const { error } = await supabase
-      .from("cabsonline_bookings")
-      .update({
-        status: "assigned",
-        driver_id: driver.id,
-        driver_name: driver.name,
-        driver_car: driver.car,
-        driver_plate: driver.plate,
-        tracking_step: 2,
-      })
-      .eq("booking_ref", bookingRef);
-
-    if (error) {
-      console.error(error);
-      setMessage(error.message);
-      return;
-    }
-
-    setMessage(`Booking ${bookingRef} has been assigned to ${driver.name}.`);
-    await loadBookingsFromSupabase();
-  }
-
   async function processPayment(bookingRef: string) {
     const { error } = await supabase
       .from("cabsonline_bookings")
@@ -330,22 +233,6 @@ export default function Home() {
     await loadBookingsFromSupabase();
   }
 
-  async function clearDemoData() {
-    const { error } = await supabase
-      .from("cabsonline_bookings")
-      .delete()
-      .neq("booking_ref", "");
-
-    if (error) {
-      console.error(error);
-      setMessage(error.message);
-      return;
-    }
-
-    setMessage("Demo data has been cleared.");
-    await loadBookingsFromSupabase();
-  }
-
   return (
     <main className="app">
       <header className="hero">
@@ -357,6 +244,14 @@ export default function Home() {
             real NZ address search, map-based interaction, driver assignment,
             customer tracking, and customer-side payment simulation.
           </p>
+          <div className="heroActions">
+            <Link className="linkButton" href="/admin">
+              Admin Login
+            </Link>
+            <Link className="linkButton secondary" href="/driver">
+              Driver Login
+            </Link>
+          </div>
         </div>
 
         <div className="heroCard">
@@ -372,13 +267,6 @@ export default function Home() {
           onClick={() => setActiveTab("booking")}
         >
           Booking
-        </button>
-
-        <button
-          className={activeTab === "admin" ? "active" : ""}
-          onClick={() => setActiveTab("admin")}
-        >
-          Admin Dashboard
         </button>
 
         <button
@@ -418,16 +306,6 @@ export default function Home() {
             destinationLon={form.destinationLon}
           />
         </section>
-      )}
-
-      {activeTab === "admin" && (
-        <AdminDashboard
-          bookings={filteredBookings}
-          adminSearch={adminSearch}
-          setAdminSearch={setAdminSearch}
-          assignDriver={assignDriver}
-          clearDemoData={clearDemoData}
-        />
       )}
 
       {activeTab === "tracking" && (

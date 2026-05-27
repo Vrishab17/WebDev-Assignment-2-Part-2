@@ -1,8 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { drivers } from "@/data/drivers";
-import type { Booking } from "@/types/cabsonline";
+import type { Booking, Driver } from "@/types/cabsonline";
 import { formatDate } from "@/utils/bookingUtils";
 import StatusBadge from "@/components/StatusBadge";
 
@@ -12,6 +11,7 @@ type Props = {
   setAdminSearch: (value: string) => void;
   assignDriver: (bookingRef: string, driverId: string) => void;
   clearDemoData: () => void;
+  availableDrivers: Driver[];
 };
 
 export default function AdminDashboard({
@@ -20,6 +20,7 @@ export default function AdminDashboard({
   setAdminSearch,
   assignDriver,
   clearDemoData,
+  availableDrivers,
 }: Props) {
   return (
     <section className="card">
@@ -54,7 +55,6 @@ export default function AdminDashboard({
               <th>Destination</th>
               <th>Date/Time</th>
               <th>Status</th>
-              <th>Payment</th>
               <th>Driver</th>
               <th>Assign</th>
             </tr>
@@ -74,7 +74,6 @@ export default function AdminDashboard({
                 <td>
                   <StatusBadge value={booking.status} />
                 </td>
-                <td>{booking.paymentStatus}</td>
                 <td>{booking.driverName || "Not assigned"}</td>
                 <td>
                   <select
@@ -85,7 +84,7 @@ export default function AdminDashboard({
                     }
                   >
                     <option value="">Assign</option>
-                    {drivers.map((driver) => (
+                    {availableDrivers.map((driver) => (
                       <option key={driver.id} value={driver.id}>
                         {driver.name}
                       </option>
@@ -97,7 +96,7 @@ export default function AdminDashboard({
 
             {bookings.length === 0 && (
               <tr>
-                <td colSpan={10}>No active bookings found.</td>
+                <td colSpan={9}>No active bookings found.</td>
               </tr>
             )}
           </tbody>

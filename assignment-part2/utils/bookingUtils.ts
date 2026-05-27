@@ -1,27 +1,12 @@
 import type { Booking } from "@/types/cabsonline";
 import { suburbs } from "@/data/suburbs";
 
-export const STORAGE_KEY = "cabsonline_part2_bookings";
-
 export function getToday() {
   return new Date().toISOString().split("T")[0];
 }
 
 export function getCurrentTime() {
   return new Date().toTimeString().slice(0, 5);
-}
-
-export function loadBookings(): Booking[] {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveBookings(bookings: Booking[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
 }
 
 export function generateBookingReference(bookings: Booking[]) {

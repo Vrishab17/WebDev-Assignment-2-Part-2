@@ -70,6 +70,30 @@ select {
   font-size: 42px;
 }
 
+.heroActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  color: #15284c;
+  text-decoration: none;
+  padding: 11px 15px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.linkButton.secondary {
+  background: #d1fadf;
+  color: #05603a;
+}
+
 .tabs {
   display: flex;
   gap: 10px;
@@ -124,6 +148,10 @@ select {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
 }
 
+.card + .card {
+  margin-top: 20px;
+}
+
 .card h2 {
   margin-top: 0;
 }
@@ -170,6 +198,23 @@ button.primary {
 
 button.danger {
   background: #b42318;
+}
+
+.loginCard {
+  width: min(460px, 100%);
+  margin: 0 auto;
+}
+
+.adminToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.adminToolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .sectionHeader {
@@ -396,6 +441,53 @@ th {
   color: #475467;
 }
 
+.driverStatusGrid,
+.tripList {
+  display: grid;
+  gap: 14px;
+}
+
+.driverStatus {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #dde3ea;
+  border-radius: 12px;
+}
+
+.driverStatus h3,
+.tripCard h3 {
+  margin: 0 0 4px;
+}
+
+.driverStatus p {
+  margin: 2px 0;
+  color: #475467;
+}
+
+.tripCard {
+  border: 1px solid #dde3ea;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.driverTripSummary p {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.warningText {
+  color: #7a5d00;
+  background: #fff3cd;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
 @media (max-width: 900px) {
   .hero,
   .grid.two,
@@ -414,6 +506,13 @@ th {
 }
 .addressBox {
   position: relative;
+}
+
+.addressLoading {
+  display: block;
+  margin-top: 6px;
+  color: #475467;
+  font-size: 13px;
 }
 
 .suggestions {
