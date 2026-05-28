@@ -22,8 +22,8 @@ CabsOnline Part 2 is a standalone modern web application inspired by the Part 1 
 Create `.env.local` with Supabase browser-safe keys:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_URL=https://spitebanuacytjptense.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwaXRlYmFudWFjeXRqcHRlbnNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTQ3NzksImV4cCI6MjA5NTM3MDc3OX0.bcoERY0miAiEAbp30jpMijfbczmDdT3OCxJV2q5fnko
 ```
 
 The app also supports `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as a fallback key name.
